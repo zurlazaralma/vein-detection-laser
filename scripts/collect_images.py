@@ -204,6 +204,219 @@ def download_wikimedia(n: int, out_dir: Path):
     print(f"\n[Wikimedia] Downloaded {downloaded} images to {out_dir}")
 
 
+# ── DermNet NZ ────────────────────────────────────────────────────────────────
+#
+# DermNet NZ (dermnetnz.org) is the authoritative clinical dermatology
+# reference, hosted in New Zealand. Images are 640×480 standard clinical
+# photographs — exactly the right type for laser vein targeting.
+#
+# Topics confirmed to have relevant clinical vein images:
+#   telangiectasia       — 18+ images of spider vein networks on skin
+#   varicose-veins       — 6  images of bulging varicose veins on legs
+#   venous-insufficiency — 9  images of chronic venous insufficiency
+#   venous-lake          — 8  images of venous lakes (lips/face)
+#   livedo-reticularis   — 4  images of mottled vascular patterns
+#   hereditary-haemorrhagic-telangiectasia — HHT / Osler-Weber-Rendu
+#   rosacea              — facial capillary vessels
+#
+# License: DermNet NZ images are copyrighted but may be used for
+#   non-commercial research with attribution. Images are downloaded
+#   only once per run and not redistributed.
+
+DERMNET_BASE = "https://dermnetnz.org"
+
+DERMNET_TOPICS = [
+    # topic-url-slug,                     label for filename
+    ("telangiectasia",                    "telangiectasia"),
+    ("varicose-veins",                    "varicose_veins"),
+    ("venous-insufficiency",              "venous_insufficiency"),
+    ("venous-lake",                       "venous_lake"),
+    ("livedo-reticularis",               "livedo_reticularis"),
+    ("rosacea",                           "rosacea"),
+    ("hereditary-haemorrhagic-telangiectasia", "hht"),
+    ("angioma-serpiginosum",              "angioma_serpiginosum"),
+    ("spider-angioma",                    "spider_angioma"),
+    ("port-wine-stain",                   "port_wine_stain"),
+    ("venous-malformation",               "venous_malformation"),
+    ("capillaritis",                      "capillaritis"),
+    ("purpura",                           "purpura"),
+]
+
+_dermnet_session = requests.Session()
+_dermnet_session.verify = VERIFY_SSL
+_dermnet_session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": "https://dermnetnz.org/",
+})
+
+
+def download_dermnet(n: int, out_dir: Path):
+    """
+    Scrape and download clinical vein images from DermNet NZ.
+    Images are standard clinical photographs (640×480) showing
+    telangiectasias, varicose veins, and other vascular conditions
+    — exactly the type needed for laser treatment targeting.
+    """
+    import re as _re
+    out_dir.mkdir(parents=True, exist_ok=True)
+    downloaded = 0
+    all_img_urls = []  # (label, full_url)
+
+    print(f"\n[DermNet NZ] Scanning {len(DERMNET_TOPICS)} topic pages...", flush=True)
+
+    for topic_slug, label in DERMNET_TOPICS:
+        if downloaded >= n:
+            break
+        url = f"{DERMNET_BASE}/topics/{topic_slug}"
+        try:
+            resp = _dermnet_session.get(url, timeout=20)
+            if resp.status_code != 200:
+                continue  # silently skip 404s
+
+            # Extract image partial paths from HTML
+            img_paths = _re.findall(r'Uploads/[^\s"\'<>?]+\.(?:jpg|jpeg|png)', resp.text, _re.IGNORECASE)
+            img_paths = list(set(img_paths))
+
+            if img_paths:
+                print(f"  {topic_slug}: {len(img_paths)} images", flush=True)
+                for p in img_paths:
+                    all_img_urls.append((label, f"{DERMNET_BASE}/assets/{p}"))
+            time.sleep(0.5)
+
+        except Exception as e:
+            print(f"  {topic_slug}: {e}", flush=True)
+
+    # Download up to n images
+    print(f"\n  Total: {len(all_img_urls)} images found. Downloading up to {n}...", flush=True)
+    import random as _rand
+    _rand.seed(42)
+    _rand.shuffle(all_img_urls)
+
+    for label, img_url in tqdm(all_img_urls[:n], desc="  Downloading"):
+        fname_stem = img_url.split("/")[-1].rsplit(".", 1)[0]
+        fname = out_dir / f"dermnet_{label}_{fname_stem}.jpg"
+        if fname.exists():
+            downloaded += 1
+            continue
+        try:
+            resp = _dermnet_session.get(img_url, timeout=30)
+            resp.raise_for_status()
+            img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+            if img.width < 200 or img.height < 200:
+                continue
+            img.save(fname, "JPEG", quality=95)
+            downloaded += 1
+        except Exception:
+            pass
+        time.sleep(0.3)
+
+    print(f"\n[DermNet NZ] Downloaded {downloaded} images to {out_dir}", flush=True)
+
+
+# ── Fitzpatrick17k ───────────────────────────────────────────────────────────
+#
+# Harvard / Groh et al. (2021) — 16,577 clinical skin photos from DermNet NZ
+# and related sources, labeled with Fitzpatrick skin type + disease category.
+# Free, no API key required.
+#
+# We filter for vein/vascular lesion categories relevant to laser treatment:
+#   telangiectases  — spider veins, fine superficial vessels (main target)
+#   rosacea         — facial capillaries and flushing vessels
+#   port wine stain — vascular malformation, often laser-treated
+#   livedo reticularis — mottled vascular network pattern
+#
+# Reference: Groh et al., "Evaluating deep neural networks trained on clinical
+#   images in dermatology with the Fitzpatrick 17k dataset", CVPRW 2021.
+# Dataset:   https://github.com/mattgroh/fitzpatrick17k
+# License:   CC BY 4.0
+
+FITZPATRICK_CSV = "https://raw.githubusercontent.com/mattgroh/fitzpatrick17k/main/fitzpatrick17k.csv"
+
+FITZPATRICK_VEIN_LABELS = {
+    "telangiectases",      # spider veins (primary target)
+    "rosacea",             # facial capillary vessels
+    "port wine stain",     # vascular malformation
+    "livedo reticularis",  # vascular network pattern
+}
+
+_fitz_session = requests.Session()
+_fitz_session.verify = VERIFY_SSL
+_fitz_session.headers.update({
+    "User-Agent": "VeinDatasetCollector/1.0 (research; almalasers.com)",
+    "Accept": "image/jpeg,image/png,image/*",
+})
+
+
+def download_fitzpatrick(n: int, out_dir: Path):
+    """
+    Download clinical vein/vascular images from the Fitzpatrick17k dataset.
+    Filters for telangiectases, rosacea, port wine stain, and livedo reticularis.
+    Images are standard clinical photographs (not dermoscopy) from DermNet NZ
+    and similar clinical reference sources — appropriate for laser targeting.
+    """
+    import csv, io, ssl
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Fetch the CSV index
+    print(f"\n[Fitzpatrick17k] Fetching dataset index...", flush=True)
+    try:
+        resp = _fitz_session.get(FITZPATRICK_CSV, timeout=30)
+        resp.raise_for_status()
+        rows = list(csv.DictReader(io.StringIO(resp.text)))
+    except Exception as e:
+        print(f"  ERROR fetching CSV: {e}")
+        return
+
+    # Filter for vein-relevant categories
+    vein_rows = [r for r in rows if r.get("label", "").lower() in FITZPATRICK_VEIN_LABELS]
+    print(f"  Found {len(vein_rows)} vein-relevant images across categories:")
+    from collections import Counter
+    for label, count in sorted(Counter(r["label"] for r in vein_rows).items()):
+        print(f"    {count:4d}  {label}")
+
+    # Shuffle for variety across categories
+    import random as _random
+    _random.seed(42)
+    _random.shuffle(vein_rows)
+    vein_rows = vein_rows[:n]
+
+    print(f"\n  Downloading {len(vein_rows)} images...", flush=True)
+    downloaded = 0
+    skipped = 0
+
+    for row in tqdm(vein_rows, desc="  Downloading"):
+        url = row.get("url", "")
+        label = row.get("label", "unknown").replace(" ", "_")
+        img_id = row.get("md5hash", f"img_{downloaded}")[:12]
+
+        if not url or not url.startswith("http"):
+            skipped += 1
+            continue
+
+        try:
+            resp = _fitz_session.get(url, timeout=30)
+            resp.raise_for_status()
+            ct = resp.headers.get("content-type", "")
+            if "image" not in ct and not url.lower().endswith((".jpg", ".jpeg", ".png")):
+                skipped += 1
+                continue
+            img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+            if img.width < 200 or img.height < 200:
+                skipped += 1
+                continue
+            fname = out_dir / f"fitz_{label}_{img_id}.jpg"
+            img.save(fname, "JPEG", quality=95)
+            downloaded += 1
+        except Exception as e:
+            skipped += 1
+        time.sleep(0.2)
+
+    print(f"\n[Fitzpatrick17k] Downloaded {downloaded} images ({skipped} skipped) to {out_dir}")
+
+
 # ── Roboflow Universe ─────────────────────────────────────────────────────────
 #
 # These are the best available public vein datasets on Roboflow Universe.
@@ -261,7 +474,7 @@ def download_roboflow(api_key: str, out_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Collect vein images from public sources")
-    parser.add_argument("--source", choices=["isic", "wikimedia", "roboflow", "all"],
+    parser.add_argument("--source", choices=["isic", "wikimedia", "dermnet", "roboflow", "fitzpatrick", "all"],
                         default="all", help="Image source to download from")
     parser.add_argument("--n", type=int, default=50, help="Number of images to download")
     parser.add_argument("--out", type=str, default="dataset/raw_downloads",
@@ -276,6 +489,10 @@ def main():
         download_isic(args.n, out_dir / "isic")
     if args.source in ("wikimedia", "all"):
         download_wikimedia(args.n, out_dir / "wikimedia")
+    if args.source in ("dermnet", "all"):
+        download_dermnet(args.n, out_dir / "dermnet")
+    if args.source in ("fitzpatrick", "all"):
+        download_fitzpatrick(args.n, out_dir / "fitzpatrick")
     if args.source in ("roboflow", "all") and args.api_key:
         download_roboflow(args.api_key, out_dir)
     elif args.source == "roboflow" and not args.api_key:

@@ -1,8 +1,8 @@
 {
-  "total": 70,
-  "train": 49,
-  "val": 14,
-  "test": 7,
+  "total": 149,
+  "train": 104,
+  "val": 29,
+  "test": 16,
   "size": 640,
   "split": [
     70,
@@ -10,7 +10,9 @@
     10
   ],
   "sources": [
-    "HAM10000-vasc (ISIC)",
-    "Wikimedia Commons"
-  ]
+    "DermNet NZ (clinical photos)",
+    "Wikimedia Commons",
+    "ISIC HAM10000 vasc"
+  ],
+  "notes": "Clinical photographs of telangiectasias, varicose veins, venous insufficiency, livedo reticularis"
 }
