@@ -6,6 +6,19 @@ models/runs/
 # Raw downloads (not versioned — regenerate with collect_images.py)
 dataset/raw_downloads/
 
+# Prepared dataset (large binaries — regenerate with run_full_collect.py)
+dataset/images/
+dataset/labels/
+dataset/previews/
+
+# Temp output logs
+*_out.txt
+*_err.txt
+annotate_out.txt
+annotate_err.txt
+isic_test*.txt
+prepare_*.txt
+
 # Python
 __pycache__/
 *.pyc

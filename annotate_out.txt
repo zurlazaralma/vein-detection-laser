@@ -1,3 +1,0 @@
-Found 35 images in dataset\images\train
-[SAM2] Not installed — falling back to contour-only mode.
-       Install: pip install git+https://github.com/facebookresearch/sam2.git
