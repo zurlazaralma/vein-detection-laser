@@ -39,19 +39,34 @@ def frangi_vessel_mask(img_bgr: np.ndarray, scale_range=(1, 6)) -> np.ndarray:
     """
     Frangi tubeness filter — highlights elongated tubular structures.
     Returns float32 mask [0..1].
+
+    Speed optimisation: downsample to 256px before Frangi (10x faster),
+    use only 2 sigmas, then upsample result to original size.
     """
     from skimage.filters import frangi
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
-    # Invert for dark vessels on bright skin background
+
+    h, w = img_bgr.shape[:2]
+    # Downsample for speed — Frangi cost scales with image area
+    scale_factor = 256 / max(h, w)
+    small_h = max(1, int(h * scale_factor))
+    small_w = max(1, int(w * scale_factor))
+    small = cv2.resize(img_bgr, (small_w, small_h), interpolation=cv2.INTER_AREA)
+
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
     gray_inv = 1.0 - gray
-    tube = frangi(gray_inv, sigmas=range(*scale_range), black_ridges=False)
-    # Also run on original (some veins are darker)
-    tube2 = frangi(gray, sigmas=range(*scale_range), black_ridges=True)
+
+    # Two sigmas only (bright and dark ridges)
+    sigmas = [1.5, 3.0]
+    tube  = frangi(gray_inv, sigmas=sigmas, black_ridges=False)
+    tube2 = frangi(gray,     sigmas=sigmas, black_ridges=True)
     combined = np.maximum(tube, tube2)
-    # Normalize
+
     if combined.max() > 0:
         combined /= combined.max()
-    return combined.astype(np.float32)
+
+    # Upsample back to original resolution
+    result = cv2.resize(combined.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR)
+    return result
 
 
 def hsv_vein_mask(img_bgr: np.ndarray) -> np.ndarray:

@@ -107,7 +107,7 @@ def main():
     all_imgs = deduplicate(all_imgs)
 
     train, val, test = split(all_imgs, *args.split)
-    print(f"\nSplit → train:{len(train)}  val:{len(val)}  test:{len(test)}")
+    print(f"\nSplit -> train:{len(train)}  val:{len(val)}  test:{len(test)}")
 
     for subset, paths in [("train", train), ("val", val), ("test", test)]:
         print(f"\nCopying {subset}...")
