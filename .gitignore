@@ -6,10 +6,10 @@ models/runs/
 # Raw downloads (not versioned — regenerate with collect_images.py)
 dataset/raw_downloads/
 
-# Prepared dataset (large binaries — regenerate with run_full_collect.py)
+# Prepared dataset images/previews (large binaries — regenerate with run_full_collect.py)
 dataset/images/
-dataset/labels/
 dataset/previews/
+# Labels ARE versioned (small text files, product of annotation pipeline)
 
 # Temp output logs
 *_out.txt
