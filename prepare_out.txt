@@ -1,0 +1,15 @@
+Warning: imagehash not installed — skipping deduplication. pip install imagehash
+
+Scanning dataset\raw_downloads for images...
+Found 50 images
+
+Split -> train:35  val:10  test:5
+
+Copying train...
+
+Copying val...
+
+Copying test...
+
+Manifest written to dataset\manifest.json
+Done. Next step: annotate images in dataset/images/ using Label Studio or LabelImg.
