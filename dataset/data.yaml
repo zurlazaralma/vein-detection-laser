@@ -1,0 +1,20 @@
+# Vein Detection Dataset — YOLO Segmentation Format
+# Target: Superficial blood vessel detection for aesthetic laser applications
+# Classes: spider veins (telangiectasias), facial veins / broken capillaries
+
+path: ../dataset
+train: images/train
+val:   images/val
+test:  images/test
+
+nc: 2
+
+names:
+  0: spider_vein    # Telangiectasias — fine red/purple web-like vessels on skin surface
+  1: facial_vein    # Broken capillaries, rosacea vessels, perinasal/cheek vessels
+
+# Dataset info
+# Target: 50–100 images (initial pilot)
+# Annotation format: YOLO segmentation polygon masks (.txt per image)
+# Recommended input resolution: 640×640
+# Train/Val/Test split: 70/20/10

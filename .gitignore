@@ -1,0 +1,26 @@
+# Model weights (large files — use GitHub Releases instead)
+models/runs/
+*.pt
+*.onnx
+
+# Raw downloads (not versioned — regenerate with collect_images.py)
+dataset/raw_downloads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+env/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Output
+output/
